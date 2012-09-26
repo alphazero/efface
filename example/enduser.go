@@ -25,28 +25,23 @@ import (
 func main() {
 	v := newValue()
 
-	e := v.Set(errors.New("Salaam!"))
-	if e != nil && efface.IsRecoverable(e) {
-		re, _ := e.(efface.Recoverable).Recover(errors.New("bug - future was dirty!"))
-		if re != nil {
-			fmt.Printf("* main * error * %s\n", re)
-			return
-		}
-	}
+	v.Set("Salaam!")
 
+	// v is dirty and we expect an error here
+	// example of using Recoverable on the enduser / call site
+	//
 	newvalue := "Salaam again!"
 	e = v.Set(errors.New(newvalue))
-	if e != nil && efface.IsRecoverable(e) {
-		fmt.Printf("* main * recoverable-error * %s\n", e)
+	switch e.(type) {
+	case efface.Recoverable:
 		re, _ := e.(efface.Recoverable).Recover(newvalue)
 		if re != nil {
 			fmt.Printf("* main * error * error on recover attempt * %s\n", re)
 			return
 		}
+	case error:
+		fmt.Printf("* main * unrecoverable error * %s\n", e)
+		return
+	default: // no error
 	}
-	Debug(v.Get())
-}
-
-func Debug(v interface{}) {
-	fmt.Printf("* debug * value: %s\n", v)
 }
