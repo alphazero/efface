@@ -31,7 +31,7 @@
 // A e.Recovery() will return as generalized marshalled out params a []interface{}
 // result set of the package provided RecoverFn (whatever they may be).
 //
-package efface 
+package efface
 
 import (
 	"fmt"
