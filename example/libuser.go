@@ -22,11 +22,19 @@ import (
 	"fmt"
 )
 
+// ======================================================================
+//  * usage * writing functions that return Recoverble
+// ======================================================================
+
+var err_dirtyset error = fmt.Errorf("dirty value - use forceSet(newvalue, true) to force set of dirty value")
+
+// a value type api with explicit set and get
 type Value interface {
 	Set(v interface{}) error
 	Get() (v interface{})
 }
 
+// supports Value interface
 type value struct {
 	v interface{}
 }
@@ -35,33 +43,36 @@ func newValue() Value {
 	return &value{}
 }
 
+// Set method doesn't allow dirty sets,
+// and returns a recoverable error in that case, with signature:
+//
+// Recoverable()@Set => type func(v interface{}, f bool) (e error)
+// - v: value to set
+// - f: force set on dirty set
+// - e: recovery attempt result.
 func (self *value) Set(v interface{}) error {
 	if self.v != nil {
-		// error to set on dirty value but recoverable
-		return self.newDirtySetError() // use efface error type
+		return self.newDirtySetError()
 	}
 	self.v = v
 	return nil
 }
 
-var set_error error = fmt.Errorf("dirty value - use SetF to force set of dirty value")
-
 func (self *value) newDirtySetError() error {
-	fn := func(in ...interface{}) (error, []interface{}) {
-
-		// try recover
-		e := self.forceSet(in[0])
-
-		out := make([]interface{}, 1)
-		out[0] = e
-
-		return nil, out
+	// define recover function - here was just delegate to a method call.
+	fn := func(in ...interface{}) interface{} {
+		out := self.forceSet(in[0], in[1].(bool))
+		return out
 	}
-	return efface.NewRecoverableError(set_error, fn)
+	// return recoverable error
+	return efface.NewRecoverableError(err_dirtyset, fn)
 }
 
 // Force Set of dirty value
-func (self *value) forceSet(v interface{}) error {
+func (self *value) forceSet(v interface{}, force bool) error {
+	if self.v != nil && !force {
+		return self.newDirtySetError()
+	}
 	self.v = nil
 	e := self.Set(v)
 	return e
@@ -69,4 +80,34 @@ func (self *value) forceSet(v interface{}) error {
 
 func (self *value) Get() (v interface{}) {
 	return self.v
+}
+
+// ======================================================================
+//  * usage * using functions returning Recoverable
+// ======================================================================
+
+func main() {
+	v := newValue()
+
+	// set v 
+	v.Set("Salaam!")
+
+	// again calling set should raise an error.
+	// v is dirty and we expect an error here
+	// example of using Recoverable on the enduser / call site
+	newvalue := "Salaam again!"
+	e := v.Set(newvalue)
+	fmt.Printf("* debug * main * v.Set() => '%s'\n", e)
+	switch e.(type) {
+	case efface.Recoverable:
+		re, out := e.(efface.Recoverable).Recover(newvalue, true)
+		if re != nil {
+			fmt.Printf("* main * error * error on recover attempt * %s\n", re)
+			return
+		}
+	case error:
+		fmt.Printf("* main * unrecoverable error * %s\n", e)
+		return
+	default: // no error
+	}
 }

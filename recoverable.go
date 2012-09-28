@@ -37,10 +37,11 @@ import (
 	"fmt"
 )
 
-type RecoverFn func(in_args ...interface{}) (error, []interface{})
+type RecoverFn func(in_args ...interface{}) (interface{})
+
 type Recoverable interface {
 	error
-	Recover(in_args ...interface{}) (error, []interface{})
+	Recover(in_args ...interface{}) (error, interface{})
 }
 
 func IsRecoverable(ref interface{}) bool {
@@ -52,8 +53,8 @@ func IsRecoverable(ref interface{}) bool {
 }
 
 type reocverableError struct {
-	cause       error
-	recoverFunc RecoverFn
+	cause error
+	fn    RecoverFn
 }
 
 func NewRecoverableError(cause error, fn RecoverFn) Recoverable {
@@ -64,7 +65,7 @@ func (e reocverableError) Error() string {
 	return e.cause.Error()
 }
 
-func (e reocverableError) Recover(in ...interface{}) (re error, rout []interface{}) {
+func (e reocverableError) Recover(in ...interface{}) (re error, rout interface{}) {
 	defer func() {
 		p := recover()
 		if p != nil {
@@ -78,5 +79,6 @@ func (e reocverableError) Recover(in ...interface{}) (re error, rout []interface
 		}
 		return
 	}()
-	return e.recoverFunc(in...)
+	rout = e.fn(in...)
+	return
 }
